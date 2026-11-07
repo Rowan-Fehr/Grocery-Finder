@@ -6,7 +6,7 @@
   const groups = {
     baking: "all purpose flour|baking powder|brown sugar|caster sugar|corn flour|cornstarch|flour|golden caster sugar|muscovado sugar|plain flour|puff pastry|shortcrust pastry|shortening|sugar|yeast",
     "herbs and spices": "all-purpose seasoning|allspice|bay leaf|bay leaves|black pepper|cajun|caraway seed|cardamom|cayenne pepper|chili powder|chilli flakes|chilli powder|chinese five spice powder|cinnamon|cinnamon stick|clove|cloves|coriander|cumin|cumin seeds|curry powder|dried mint|dried oregano|fajita seasoning|fennel seeds|garam masala|garlic powder|ground coriander|ground cumin|ground ginger|ground nutmeg|harissa spice|italian seasoning|kosher salt|marjoram|mustard powder|mustard seeds|nutmeg|oregano|paprika|pepper|red chilli flakes|red chilli powder|red pepper flakes|salt|sea salt|sesame seed|smoked paprika|star anise|summer savoury|sweet smoked paprika|turmeric",
-    "condiments and oils": "apple cider vinegar|balsamic vinegar|barbeque sauce|beef gravy|canola oil|capers|chilli sauce|chimichurri sauce|clear honey|dijon mustard|enchilada sauce|extra virgin olive oil|fish sauce|garlic sauce|ground nut oil|honey|hotsauce|lemon juice|lime juice|mayonnaise|minced garlic|mirin|mustard|oil|olive oil|passata|peanut butter|rapeseed oil|red curry paste|red wine vinegar|rice vinegar|salsa|sesame seed oil|sherry vinegar|soy sauce|sunflower oil|sweet chilli sauce|tahini|tamarind paste|thai fish sauce|thai green curry paste|thai red curry paste|tomato ketchup|tomato puree|tomato sauce|vegetable oil|white vinegar|white wine vinegar|worcestershire sauce",
+    "condiments and oils": "apple cider vinegar|balsamic vinegar|barbeque sauce|beef gravy|canola oil|capers|chilli sauce|chimichurri sauce|clear honey|dijon mustard|enchilada sauce|extra virgin olive oil|fish sauce|garlic sauce|ground nut oil|honey|hotsauce|lemon juice|lime juice|mayonnaise|minced garlic|mirin|mustard|oil|olive oil|passata|peanut butter|red curry paste|red wine vinegar|rice vinegar|salsa|sesame seed oil|sherry vinegar|soy sauce|sunflower oil|sweet chilli sauce|tahini|tamarind paste|thai fish sauce|thai green curry paste|thai red curry paste|tomato ketchup|tomato puree|tomato sauce|vegetable oil|white vinegar|white wine vinegar|worcestershire sauce",
     produce: "asparagus|aubergine|avocado|baby new potatoes|baby plum tomatoes|bamboo shoot|basil|basil leaves|bean sprouts|beetroot|broccoli|butternut squash|cabbage|carrot|carrots|celery|challots|cherry tomatoes|chilli|chives|chopped onion|chopped parsley|cilantro|coriander leaves|corn on the cob|courgettes|cucumber|dill|egg plants|fennel|fennel bulb|floury potatoes|fresh basil|freshly chopped parsley|garlic|garlic bulb|garlic clove|ginger|green beans|green chilli|green pepper|hispi (sweetheart) cabbage|horseradish|jalapeno|kaffir lime leaves|kale|leek|lemon|lemongrass|lemongrass stalks|lemons|lettuce|lime|lime leaves|little gem lettuce|mint|mushrooms|new potatoes|onion|onions|orange|pak choi|parsley|peas|plum tomatoes|potatoes|pumpkin|red cabbage|red chilli|red onions|red pepper|red potatoes|rocket|rosemary|russet potato|sage|savoy cabbage|scallions|scotch bonnet|shallots|shiitake mushrooms|small potatoes|spinach|spring onions|squash|stir-fry vegetables|swede|sweet potatoes|sweetcorn|thyme|tomato|tomatoes|turnips|water chestnut|white cabbage|yellow pepper",
     meat: "bacon|beef|beef brisket|chicken|chicken breast|chicken breasts|chicken drumsticks|chicken legs|chicken thighs|chicken wings|chorizo|corned beef|doner meat|flank steak|ground beef|ground pork|ham|lamb|lamb kidney|lamb leg|lamb loin chops|lamb mince|lamb shoulder|lean minced beef|minced beef|minced pork|pork|pork back ribs|pork chops|pork shoulder|pork tenderloin|sausages|sirloin steak",
     bakery: "baguette|bread|corn tortillas|crusty bread|flour tortilla|pita bread|rye bread|wholegrain bread",
@@ -119,10 +119,16 @@
     const url = new URL("/en/search", location.origin);
     url.searchParams.set("q", search);
 
-    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
-    if (!response.ok) throw new Error(`Walmart returned HTTP ${response.status}`);
+    const openPage = new URL(location.href);
+    const openSearch = openPage.searchParams.get("q")?.trim().toLowerCase();
+    let page = document;
 
-    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    if (openPage.pathname !== "/en/search" || openSearch !== search.toLowerCase()) {
+      const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (!response.ok) throw new Error(`Walmart returned HTTP ${response.status}`);
+      page = new DOMParser().parseFromString(await response.text(), "text/html");
+    }
+
     const linkSelector = 'a[href*="/ip/"]';
     const links = [...page.querySelectorAll(linkSelector)];
 
@@ -170,7 +176,7 @@
         ),
       ].join(" ").replace(/\s+/g, " ");
 
-      const price = text.match(/\bcurrent price\s*[:\s]*\$\s*([\d,]+\.\d{2})(?![\d.])/i);
+      
       if (!price) continue;
       readableCards += 1;
       if (/\b(?:from|starting at|about|approximately|est\.)\s*\$/i.test(text)) continue;
