@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recipe demo</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:0 auto;padding:16px;background:#faf7f2;color:#222}
+h1{font-size:1.4rem}
+#q{width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;border:1px solid #ccc;border-radius:10px}
+.hit{display:block;width:100%;text-align:left;font-size:1.05rem;background:#fff;border:1px solid #e3d9c8;border-radius:10px;padding:14px;margin-top:10px;cursor:pointer}
+.hit:hover{background:#fff3e0}
+label{display:block;margin:10px 0;color:#555;font-size:.9rem}
+#stats{position:sticky;top:0;background:#fff3e0;border-radius:8px;padding:8px 12px;margin:12px 0;font-weight:600;display:none}
+.step{background:#fff;border-radius:12px;box-shadow:0 1px 4px #0002;margin:16px 0;overflow:hidden}
+.box{aspect-ratio:1/1;background:linear-gradient(90deg,#eee,#f7f7f7,#eee);background-size:200% 100%;animation:sh 1.2s infinite;display:flex;align-items:center;justify-content:center;color:#999}
+.box.done{animation:none;background:#000}.box img{width:100%;height:100%;object-fit:cover}
+.box.err{animation:none;background:#fee;color:#a00;padding:16px;text-align:center}
+@keyframes sh{to{background-position:-200% 0}}
+#load{display:none;text-align:center;background:#fff;border-radius:14px;box-shadow:0 1px 4px #0002;padding:40px 20px;margin:16px 0}
+.spin{width:44px;height:44px;border:5px solid #f1dfc2;border-top-color:#b45309;border-radius:50%;margin:0 auto 18px;animation:rot 1s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+#tiphead{font-weight:700;color:#b45309;margin-bottom:6px}#tip{font-size:1.1rem;min-height:3.2em;transition:opacity .3s}
+.step p{margin:0;padding:12px 16px}.n{font-weight:700;color:#b45309}.t{float:right;color:#888;font-size:.85rem}
+</style></head><body>
+<div id="down" style="display:none;background:#fde2e2;color:#8a1111;padding:12px 16px;border-radius:10px;margin-bottom:12px;font-weight:600">The demo program has stopped. Double-click <b>4_START_DEMO.bat</b> in the image-generator folder, then press Ctrl+F5 here.</div>
+<h1>Find a recipe</h1>
+<input id="q" placeholder="Search, e.g. cookies" autofocus>
+<div id="hits"></div>
+<div id="load"><div class="spin"></div><div id="tiphead">Baking tip</div><div id="tip"></div></div>
+<div id="out"></div>
+<script>
+var R=[],q=document.getElementById("q"),hits=document.getElementById("hits"),out=document.getElementById("out"),stats=document.getElementById("stats");
+fetch("/api/recipes").then(r=>r.json()).then(d=>{R=d});
+function ping(){fetch("/api/ping",{cache:"no-store"}).then(function(r){document.getElementById("down").style.display=r.ok?"none":"block"}).catch(function(){document.getElementById("down").style.display="block"})}
+ping();setInterval(ping,3000);
+function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+q.oninput=function(){
+ var s=q.value.trim().toLowerCase(); hits.innerHTML="";
+ if(!s)return;
+ var m=R.filter(r=>((r.title||"")+" "+(r.tags||[]).join(" ")).toLowerCase().indexOf(s)>-1).slice(0,1);
+ m.forEach(r=>{r.steps.forEach(function(_,i){new Image().src="/img/"+r.id+"/"+(i+1)});var b=document.createElement("button");b.className="hit";b.textContent=r.title+" ("+r.steps.length+" steps)";b.onclick=function(){open_(r)};hits.appendChild(b)});
+ if(!m.length)hits.innerHTML='<p class="note">No match.</p>';
+};
+var TIPS=["Room-temperature butter and eggs mix more evenly, so your cookies bake up smoother.","Chill cookie dough for 30 minutes before baking to stop cookies spreading too thin.","Measure flour by spooning it into the cup and levelling it off. Scooping packs in too much.","Use an oven thermometer. Many ovens run 10 to 25 degrees off.","Line pans with parchment paper so nothing sticks and the bottoms don't burn.","Pull cookies out when the edges are golden but the middle still looks a little soft. They finish on the pan.","Let cookies cool on the sheet for a few minutes before moving them, or they'll fall apart.","Don't over-mix once the flour goes in. It makes baked goods tough.","Bake one tray at a time on the middle rack for the most even browning.","Use cold pans for each batch. A hot pan melts the dough before it bakes.","A pinch of salt makes chocolate and sweet flavours taste stronger.","Weighing ingredients on a kitchen scale is more accurate than cups."];
+var tipTimer=null,showTimer=null,tipI=0;
+function tipStart(){var t=document.getElementById("tip");tipI=Math.floor(Math.random()*TIPS.length);t.textContent=TIPS[tipI];tipTimer=setInterval(function(){t.style.opacity=0;setTimeout(function(){tipI=(tipI+1)%TIPS.length;t.textContent=TIPS[tipI];t.style.opacity=1},300)},4000)}
+function loadStop(){clearInterval(tipTimer);clearTimeout(showTimer);document.getElementById("load").style.display="none";out.style.display="block"}
+function open_(r){
+ loadStop();
+ showTimer=setTimeout(function(){document.getElementById("load").style.display="block";out.style.display="none";tipStart()},400);
+ hits.innerHTML=""; out.innerHTML=""; var done=0, total=r.steps.length, ok=0;
+ r.steps.forEach(function(st,i){
+  var text=typeof st==="string"?st:(st.text||st.instruction||"");
+  var d=document.createElement("div");d.className="step";
+  d.innerHTML='<div class="box"></div><p><span class="n">Step '+(i+1)+'.</span> '+esc(text)+'</p>';
+  out.appendChild(d);
+  var box=d.firstChild;
+  var live=location.search.indexOf("live=1")>-1;
+  function gen(){return fetch("/api/step",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:r.id,n:i+1})})}
+  (live?gen():fetch("/img/"+r.id+"/"+(i+1)).then(function(res){return res.ok?res:gen()}))
+  .then(function(res){if(!res.ok)return res.text().then(function(t){throw new Error(t)});var src=res.headers.get("X-Source");return res.blob().then(function(b){return[b,src]})})
+  .then(function(a){var img=new Image();img.onload=function(){box.className="box done";box.innerHTML="";box.appendChild(img);ok++;fin()};img.src=URL.createObjectURL(a[0])})
+  .catch(function(e){box.className="box err";box.textContent=/Failed to fetch/i.test(e.message)?"The demo program has stopped. Restart it with 4_START_DEMO.bat.":e.message;fin()});
+ });
+ function fin(){done++;if(done==total)loadStop()}
+}
+</script></body></html>
